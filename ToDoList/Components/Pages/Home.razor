@@ -1,0 +1,90 @@
+﻿@page "/"
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@using ToDoList.Data
+@using ToDoList.Data.Entities
+@inject IDbContextFactory<ToDoContext> ToDoContextFactory
+
+
+<PageTitle>To Do</PageTitle>
+
+<div class="px-2" style="width: fit-content;">
+    <MBBadge BadgeStyle="MBBadgeStyle.ValueBearing" Value="@GeneralValue" Exited="@Exited" />
+    <h1 class="text-2xl pr-8">To Do List</h1>
+</div>
+
+@if (Loading)
+{
+    <div>Loading...</div>
+}
+else
+{
+    <div class="flex flex-col gap-3 mt-2 p-2 border border-solid rounded">
+        @if (!ToDoItems.Any())
+        {
+            <span>There are no To Dos 😒😒😒</span>
+            <MBButton Label="Add Sample Data" ButtonStyle="MBButtonStyle.ContainedRaised" @onclick="async () => await AddSampleData()" />
+        }
+
+        @foreach (var item in ToDoItems)
+        {
+            <div>
+                <span>
+                    @item.Id - @item.Description - @if (item.IsCompleted)
+                                                   {
+                                                       <span>Completed</span>
+                                                   }
+                                                   else
+                                                   {
+                                                       <span>Incomplete</span>
+                                                   }
+                </span>
+                <button @onclick="async () => await DeleteItem(item.Id)">Delete</button>
+            </div>
+        }
+    </div>
+}
+
+@code
+{
+    private bool Exited { get; set; } = false;
+    private string GeneralValue => ToDoItems.Count().ToString();
+
+    private bool Loading;
+
+    private IEnumerable<ToDo> ToDoItems = Enumerable.Empty<ToDo>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        Loading = true;
+        await Task.Delay(1000);
+        await LoadData();
+        Loading = false;
+    }
+
+    private async Task LoadData()
+    {
+        await using var context = await ToDoContextFactory.CreateDbContextAsync();
+        ToDoItems = await context.ToDos.ToListAsync();
+    }
+
+    private async Task AddSampleData()
+    {
+        var seedToDos = new SeedToDos();
+        await using var context = await ToDoContextFactory.CreateDbContextAsync();
+        await seedToDos.SeedDatabaseWithContactCountOfAsync(context, 5);
+        await LoadData();
+    }
+
+    private async Task DeleteItem(int id)
+    {
+        await using var context = await ToDoContextFactory.CreateDbContextAsync();
+        var item = await context.ToDos.FindAsync(id);
+        if (item != null)
+        {
+            context.ToDos.Remove(item);
+            await context.SaveChangesAsync();
+            await LoadData();
+        }
+    }
+}
