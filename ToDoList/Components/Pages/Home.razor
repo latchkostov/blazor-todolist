@@ -3,14 +3,23 @@
 @using Microsoft.EntityFrameworkCore
 @using ToDoList.Data
 @using ToDoList.Data.Entities
+@using System.ComponentModel.DataAnnotations
 @inject IDbContextFactory<ToDoContext> ToDoContextFactory
 
+<style>
+    .button-red {
+        --mdc-theme-primary: var(--mb-color-red-500) !important;
+    }
+</style>
 
 <PageTitle>To Do</PageTitle>
 
-<div class="px-2" style="width: fit-content;">
-    <MBBadge BadgeStyle="MBBadgeStyle.ValueBearing" Value="@GeneralValue" Exited="@Exited" />
-    <h1 class="text-2xl pr-8">To Do List</h1>
+<div class="flex justify-between w-100">
+    <div class="px-2" style="width: fit-content;">
+        <MBBadge BadgeStyle="MBBadgeStyle.ValueBearing" Value="@NumIncompleteTodos" Exited="@Exited" />
+        <h1 class="text-2xl pr-8">To Do List</h1>
+    </div>
+    <MBButton ButtonStyle="MBButtonStyle.ContainedRaised" Label="Add To Do" LeadingIcon="add" @onclick="async () => await ShowAddDialogAsync()" />
 </div>
 
 @if (Loading)
@@ -25,34 +34,71 @@ else
             <span>There are no To Dos 😒😒😒</span>
             <MBButton Label="Add Sample Data" ButtonStyle="MBButtonStyle.ContainedRaised" @onclick="async () => await AddSampleData()" />
         }
+        
+        <MBList Items="@ToDoItems"
+                Context="todo"
+                GetKeysFunc="@((item) => item.Id)"
+                HideLineThree="true"
+                HideLineTwo="true"
+                KeyboardInteractions="true"
+                ListStyle="MBListStyle.None"
+                ListType="MBListType.Avatar"
+                OnClick="() => { }"
+                Ripple="true"
+                ShowSeparators="true">
+                
+            <Title>@todo.Description</Title>
 
-        @foreach (var item in ToDoItems)
-        {
-            <div>
-                <span>
-                    @item.Id - @item.Description - @if (item.IsCompleted)
-                                                   {
-                                                       <span>Completed</span>
-                                                   }
-                                                   else
-                                                   {
-                                                       <span>Incomplete</span>
-                                                   }
-                </span>
-                <button @onclick="async () => await DeleteItem(item.Id)">Delete</button>
-            </div>
-        }
+            <PrimaryActions>
+                <div style="width: 10rem">
+                    <MBCheckbox @bind-Value="@todo.IsCompleted" @onclick="async () => await ToggleComplete(todo.Id)" />
+                </div>
+            </PrimaryActions>
+            <SecondaryActions>
+                <div style="width: 10rem">
+                    <MBButton ButtonStyle="MBButtonStyle.ContainedRaised" class="button-red" Label="Delete" LeadingIcon="close" @onclick="async () => await DeleteItem(todo.Id)" />
+                </div>
+            </SecondaryActions>
+
+        </MBList>
     </div>
+    <MBDialog @ref="@AddDialog">
+        <Body>
+            <EditForm Model="@AddForm" OnValidSubmit="async () => await AddToDo()">
+                <DataAnnotationsValidator />
+                <div class="mdc-layout-grid__inner">
+                    <div class="mdc-layout-grid__cell--span-12">
+                        <MBTextField @bind-Value="@AddForm.Description"
+                                     Label="What needs to be done?"
+                                     style="width: 100%; margin-top: 6px;"
+                                     TextInputStyle="@MBTextInputStyle.Outlined"
+                                     TrailingIcon="person"
+                                     ValidationMessageFor="@(() => AddForm.Description)" />
+                    </div>
+                </div>
+                <div>
+                <MBButton Label="OK" type="submit"></MBButton>
+                <MBButton ButtonStyle="@MBButtonStyle.Text"
+                          Label="Cancel"
+                          @onclick="async () => await AddDialog.HideAsync()"
+                          type="button"/>
+                </div>
+            </EditForm>
+        </Body>
+    </MBDialog>
 }
 
 @code
 {
     private bool Exited { get; set; } = false;
-    private string GeneralValue => ToDoItems.Count().ToString();
+    private string NumIncompleteTodos => ToDoItems.Count(x => !x.IsCompleted).ToString();
+    private MBDialog AddDialog { get; set; }
 
     private bool Loading;
 
     private IEnumerable<ToDo> ToDoItems = Enumerable.Empty<ToDo>();
+
+    private AddToFormModel AddForm = new AddToFormModel();
 
     protected override async Task OnInitializedAsync()
     {
@@ -76,6 +122,18 @@ else
         await LoadData();
     }
 
+    private async Task ToggleComplete(int id)
+    {
+        await using var context = await ToDoContextFactory.CreateDbContextAsync();
+        var item = await context.ToDos.FindAsync(id);
+        if (item != null)
+        {
+            item.IsCompleted = !item.IsCompleted;
+            await context.SaveChangesAsync();
+            await LoadData();
+        }
+    }
+
     private async Task DeleteItem(int id)
     {
         await using var context = await ToDoContextFactory.CreateDbContextAsync();
@@ -85,6 +143,38 @@ else
             context.ToDos.Remove(item);
             await context.SaveChangesAsync();
             await LoadData();
+        }
+    }
+
+    private async Task ShowAddDialogAsync()
+    {
+        await AddDialog.ShowAsync();
+    }
+
+    private async Task AddToDo()
+    {
+        var newToDo = new ToDo
+        {
+            Description = AddForm.Description,
+            IsCompleted = false
+        };
+
+        await using var context = await ToDoContextFactory.CreateDbContextAsync();
+        await context.ToDos.AddAsync(newToDo);
+        await context.SaveChangesAsync();
+        await LoadData();
+        await AddDialog.HideAsync();
+        AddForm.Reset();
+    }
+
+    public class AddToFormModel
+    {
+        [Required]
+        public string Description { get; set; }
+
+        public void Reset()
+        {
+            Description = string.Empty;
         }
     }
 }
