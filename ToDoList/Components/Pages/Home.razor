@@ -43,7 +43,6 @@ else
                 KeyboardInteractions="true"
                 ListStyle="MBListStyle.None"
                 ListType="MBListType.Avatar"
-                OnClick="() => { }"
                 Ripple="true"
                 ShowSeparators="true">
                 
@@ -91,7 +90,7 @@ else
 @code
 {
     private bool Exited { get; set; } = false;
-    private string NumIncompleteTodos => ToDoItems.Count(x => !x.IsCompleted).ToString();
+    private string NumIncompleteTodos { get; set; }
     private MBDialog AddDialog { get; set; }
 
     private bool Loading;
@@ -107,11 +106,18 @@ else
         await LoadData();
         Loading = false;
     }
+    
+    private string GetNumIncompleteTodos() 
+    {
+        return ToDoItems.Count(x => !x.IsCompleted).ToString();
+    }
 
     private async Task LoadData()
     {
         await using var context = await ToDoContextFactory.CreateDbContextAsync();
         ToDoItems = await context.ToDos.ToListAsync();
+        NumIncompleteTodos = GetNumIncompleteTodos();
+        StateHasChanged();
     }
 
     private async Task AddSampleData()
@@ -131,6 +137,8 @@ else
             item.IsCompleted = !item.IsCompleted;
             await context.SaveChangesAsync();
             await LoadData();
+            NumIncompleteTodos = GetNumIncompleteTodos();
+            StateHasChanged();
         }
     }
 
@@ -143,6 +151,7 @@ else
             context.ToDos.Remove(item);
             await context.SaveChangesAsync();
             await LoadData();
+            StateHasChanged();
         }
     }
 
