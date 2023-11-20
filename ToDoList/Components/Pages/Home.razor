@@ -117,7 +117,6 @@ else
         await using var context = await ToDoContextFactory.CreateDbContextAsync();
         ToDoItems = await context.ToDos.ToListAsync();
         NumIncompleteTodos = GetNumIncompleteTodos();
-        StateHasChanged();
     }
 
     private async Task AddSampleData()
@@ -138,7 +137,6 @@ else
             await context.SaveChangesAsync();
             await LoadData();
             NumIncompleteTodos = GetNumIncompleteTodos();
-            StateHasChanged();
         }
     }
 
@@ -151,7 +149,6 @@ else
             context.ToDos.Remove(item);
             await context.SaveChangesAsync();
             await LoadData();
-            StateHasChanged();
         }
     }
 
